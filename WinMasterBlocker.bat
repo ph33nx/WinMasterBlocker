@@ -88,12 +88,15 @@ for /L %%i in (0,1,9999) do (
 
 :after_provider_list
 echo 99: Delete all rules (added by this script)
+echo 0: Exit
 echo.
 
 set /p "choice=Enter your choice (0-99): "
 
 :: Validate the user's choice
-if "%choice%"=="99" (
+if "%choice%"=="0" (
+    goto end
+) else if "%choice%"=="99" (
     goto delete_menu
 ) else if "%choice%" geq "0" if "%choice%" leq "2" (
     goto process_provider
@@ -224,3 +227,4 @@ goto menu
 
 :end
 endlocal
+exit /b
