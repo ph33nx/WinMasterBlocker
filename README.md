@@ -1,12 +1,24 @@
+### 🟢🔵🔴 Contributions welcome in expanding the list of vendors and installation paths!
+
+👉 If you know additional paths for app vendors or have information on other vendors, please consider contributing. (See the **Contributing** section below for details.)
+
 # 🔥 WinMasterBlocker 🔥
 
-### Your all-in-one firewall control script for blocking Adobe, Autodesk, Corel, FL Studio, and more! 💻🚫
+### Your all-in-one firewall control script for blocking Adobe, Corel, Autodesk, Maxon and more from phoning-home! 💻🚫
 
 ## What is this?
 
 Welcome to **WinMasterBlocker**—a nifty little batch script that slaps firewall rules on apps you probably don’t want connecting to the internet (like Adobe, Corel, Autodesk, FL Studio, and others). It’s your no-fuss way to get peace and quiet from those phoning-home apps. 🚫📡
 
 💡 **TL;DR:** This script blocks incoming/outgoing network access for well-known apps using **Windows Firewall**. You choose the app, the script takes care of the rest using all windows inbuilt tools.
+
+## Quick Start
+
+To run the script, simply download `WinMasterBlocker.bat` and **double-click** it or run the following command from the command line **as administrator**:
+
+```bash
+WinMasterBlocker.bat
+```
 
 ---
 
@@ -15,9 +27,7 @@ Welcome to **WinMasterBlocker**—a nifty little batch script that slaps firewal
 ### Running the script:
 
 1. **Make sure you run this as admin!** It won't work otherwise _(netsh requires it)_. We’ll prompt you if you forget, don’t worry. 😎
-2. **Double-click or run from the command line**:
-   - Want to block Adobe? Autodesk? Corel? We got you.
-   - We also throw in FL Studio for the producers out there. 🎧
+2. **Double-click or run from the command line**
 
 ### Options in the menu:
 
@@ -36,7 +46,7 @@ We love contributions, PRs, and feature requests! If you’re one of those who l
 1. **Fork it** 🍴 – You know the drill. Fork this repo.
 2. **Clone it** 🛠️ – Get the code to your local:
    ```bash
-   git clone https://github.com/YOUR_USERNAME/WinMasterBlocker.git
+   git clone https://github.com/ph33nx/WinMasterBlocker
    ```
 3. **Create a branch** 🌿 – New features? Fixes? Start a new branch:
    ```bash
@@ -47,7 +57,7 @@ We love contributions, PRs, and feature requests! If you’re one of those who l
    ```bash
    git push origin my-cool-feature
    ```
-6. **Submit a Pull Request (PR)** 🤙 – We'll take it from there.
+6. **Submit a Pull Request (PR)** 🤙
 
 ### Want to add more apps to block? 🛑
 
@@ -55,15 +65,15 @@ Feel free to throw in more providers. Just add the app to the `providers[]` and 
 
 ```batch
 :: Add new provider paths here
-set "providers[9]=NewApp"
-set "paths[9]=C:\Program Files\NewApp C:\Program Files (x86)\NewApp"
+set "vendors[7]=NewApp"
+set "paths[7]=C:\Program Files\NewApp;C:\Program Files (x86)\NewApp"
 ```
 
 ### Checklist before sending that PR 🚧:
 
 - Make sure the script **runs on your machine** before submitting. Nobody likes broken code. 🛠️
 - Follow the existing format for adding new providers or paths.
-- Respect the 💀 rule: **no hard-breaking changes** (or you’ll owe us a coffee).
+- Respect the 💀 rule: **no hard-breaking changes**.
 
 ---
 
@@ -77,7 +87,7 @@ MIT License – this means you can do pretty much anything with this, but we’d
 
 - **Author:** [ph33nx](https://github.com/ph33nx)
 - **Current Repo:** [WinMasterBlocker](https://github.com/ph33nx/WinMasterBlocker)
-- **Contributions welcomed!** - Especially for app providers and their install locations.
+- **Contributions welcomed!** - Especially for app vendors and their install locations.
 
 ---
 
