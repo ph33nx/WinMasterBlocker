@@ -9,7 +9,7 @@
 :: # and more using Windows Firewall.                      #
 :: #                                                       #
 :: # Features:                                             #
-:: # - Block rules for popular providers                   #
+:: # - Block rules for popular vendors                   #
 :: # - Delete inbound, outbound, or both types of rules    #
 :: # - Avoids duplicate firewall rules                     #
 :: # - Logs skipped entries for existing rules             #
@@ -27,26 +27,26 @@ set "COLOR_RED=0c"
 set "COLOR_YELLOW=0e"
 set "COLOR_RESET=07"
 
-:: Array of providers and their paths
-set "providers[0]=Adobe"
+:: Array of vendors and their paths
+set "vendors[0]=Adobe"
 set "paths[0]=C:\Program Files\Adobe C:\Program Files\Common Files\Adobe C:\Program Files (x86)\Adobe C:\Program Files (x86)\Common Files\Adobe C:\ProgramData\Adobe"
 
-set "providers[1]=Corel"
+set "vendors[1]=Corel"
 set "paths[1]=C:\Program Files\Corel C:\Program Files\Common Files\Corel C:\Program Files (x86)\Corel"
 
-set "providers[2]=Autodesk"
+set "vendors[2]=Autodesk"
 set "paths[2]=C:\Program Files\Autodesk C:\Program Files (x86)\Common Files\Macrovision Shared C:\Program Files (x86)\Common Files\Autodesk Shared"
 
-set "providers[3]=Image-Line (FL Studio)"
+set "vendors[3]=Image-Line (FL Studio)"
 set "paths[3]=C:\Program Files\Image-Line C:\Program Files (x86)\Image-Line C:\ProgramData\Image-Line C:\Users\%USERNAME%\Documents\Image-Line"
 
-set "providers[4]=Maxon"
+set "vendors[4]=Maxon"
 set "paths[4]=C:\Program Files\Maxon C:\Program Files (x86)\Maxon C:\ProgramData\Maxon"
 
-set "providers[5]=Red Giant"
+set "vendors[5]=Red Giant"
 set "paths[5]=C:\Program Files\Red Giant C:\Program Files (x86)\Red Giant"
 
-set "providers[6]=Dassault Systems (SolidWorks)"
+set "vendors[6]=Dassault Systems (SolidWorks)"
 set "paths[6]=C:\Program Files\SolidWorks C:\Program Files\Dassault Systemes C:\Program Files (x86)\SolidWorks C:\Program Files (x86)\Dassault Systemes"
 
 :: Check if script is run as administrator
@@ -68,18 +68,18 @@ goto menu
 :menu
 cls
 color %COLOR_GREEN%
-echo Choose a provider to block or delete rules:
+echo Choose a vendor to block or delete rules:
 echo.
 
-:: Iterate through defined providers
+:: Iterate through defined vendors
 set i=0
-:provider_loop
-if not defined providers[%i%] goto after_provider_list
-echo !i!: !providers[%i%]!
+:vendor_loop
+if not defined vendors[%i%] goto after_vendor_list
+echo !i!: !vendors[%i%]!
 set /a i+=1
-goto provider_loop
+goto vendor_loop
 
-:after_provider_list
+:after_vendor_list
 color %COLOR_RESET%
 echo 99: Delete all rules (added by this script)
 echo 0: Exit
@@ -87,14 +87,14 @@ echo.
 
 set /p "choice=Enter your choice (0-99): "
 
-:: Dynamic input validation based on the number of providers
+:: Dynamic input validation based on the number of vendors
 set max_choice=!i!
 if "%choice%"=="0" (
     goto end
 ) else if "%choice%"=="99" (
     goto delete_menu
 ) else if "%choice%" lss "%max_choice%" (
-    goto process_provider
+    goto process_vendor
 ) else (
     echo Invalid choice, try again.
     pause
@@ -167,20 +167,20 @@ color %COLOR_GREEN%
 echo Inbound and Outbound rules deleted successfully.
 goto firewall_check
 
-:: Process each provider's paths and block executables
-:process_provider
+:: Process each vendor's paths and block executables
+:process_vendor
 cls
 color %COLOR_YELLOW%
-set "selected_provider=!providers[%choice%]!"
+set "selected_vendor=!vendors[%choice%]!"
 set "selected_paths=!paths[%choice%]!"
 
-echo Blocking executables for %selected_provider%...
+echo Blocking executables for %selected_vendor%...
 color %COLOR_RESET%
 
 for %%P in (%selected_paths%) do (
     if exist "%%P" (
         for /R "%%P" %%X in (*.exe) do (
-            call :check_and_block "%%X" "%selected_provider%"
+            call :check_and_block "%%X" "%selected_vendor%"
         )
     ) else (
         color %COLOR_RED%
@@ -188,15 +188,15 @@ for %%P in (%selected_paths%) do (
         color %COLOR_RESET%
     )
 )
-echo Blocking completed for %selected_provider%.
+echo Blocking completed for %selected_vendor%.
 pause
 goto menu
 
 :: Function to check if a rule exists, and add it if not
 :check_and_block
 set "exe_path=%~1"
-set "provider_name=%~2"
-set "rule_name=%~n1 %provider_name%-block"
+set "vendor_name=%~2"
+set "rule_name=%~n1 %vendor_name%-block"
 
 for /f "tokens=*" %%r in ('powershell -command "(Get-NetFirewallRule | where {$_.DisplayName -eq '%rule_name%'}).DisplayName"') do (
     if "%%r"=="%rule_name%" (
