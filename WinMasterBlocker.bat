@@ -9,14 +9,14 @@
 :: # and more using Windows Firewall.                      #
 :: #                                                       #
 :: # Features:                                             #
-:: # - Block rules for popular vendors                   #
+:: # - Block rules for popular vendors                     #
 :: # - Delete inbound, outbound, or both types of rules    #
 :: # - Avoids duplicate firewall rules                     #
 :: # - Logs skipped entries for existing rules             #
 :: #                                                       #
 :: # Check out the repo to contribute:                     #
 :: # https://github.com/ph33nx/WinMasterBlocker            #
-:: ########################################################
+:: #########################################################
 
 @echo off
 setlocal enabledelayedexpansion
