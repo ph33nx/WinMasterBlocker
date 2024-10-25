@@ -10,7 +10,9 @@
 
 Welcome to **WinMasterBlocker**—a nifty little batch script that slaps firewall rules on apps you probably don’t want connecting to the internet (like Adobe, Autodesk, Corel, Maxon and others). It’s your no-fuss way to get peace and quiet from those phoning-home apps. 🚫📡
 
-💡 **TL;DR:** This script blocks incoming/outgoing network access for well-known apps using **Windows Firewall**. You choose the app, the script takes care of the rest using all windows inbuilt tools.
+## !IMP: Only Windows inbuilt commands & firewall cli is used to block the apps from internet access, NO third party tools or solutions are used for this script's functionality.
+
+---
 
 ## Quick Start
 
