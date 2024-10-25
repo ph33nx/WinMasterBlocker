@@ -1,4 +1,3 @@
-@echo off
 :: #########################################################
 :: ##              🔥 WinMasterBlocker 🔥                 ##
 :: #########################################################
@@ -19,20 +18,7 @@
 :: # https://github.com/ph33nx/WinMasterBlocker            #
 :: ########################################################
 
-:: Check if script is run as administrator
-:check_admin
-    net session >nul 2>&1
-    if %errorlevel% neq 0 (
-        echo.
-        echo This script must be run as Administrator.
-        echo Attempting to re-launch with elevated privileges...
-        powershell -Command "Start-Process '%~f0' -Verb RunAs"
-        exit /b
-    )
-:: If admin, proceed with script
-echo Running with Administrator privileges...
-echo.
-
+@echo off
 setlocal enabledelayedexpansion
 
 :: Color definitions (for cmd window)
@@ -51,54 +37,63 @@ set "paths[1]=C:\Program Files\Corel C:\Program Files\Common Files\Corel C:\Prog
 set "providers[2]=Autodesk"
 set "paths[2]=C:\Program Files\Autodesk C:\Program Files (x86)\Common Files\Macrovision Shared C:\Program Files (x86)\Common Files\Autodesk Shared"
 
-set "providers[9]=Image-Line (FL Studio)"
-set "paths[9]=C:\Program Files\Image-Line C:\Program Files (x86)\Image-Line C:\ProgramData\Image-Line C:\Users\%USERNAME%\Documents\Image-Line"
+set "providers[3]=Image-Line (FL Studio)"
+set "paths[3]=C:\Program Files\Image-Line C:\Program Files (x86)\Image-Line C:\ProgramData\Image-Line C:\Users\%USERNAME%\Documents\Image-Line"
 
-set "providers[6]=Maxon"
-set "paths[6]=C:\Program Files\Maxon C:\Program Files (x86)\Maxon C:\ProgramData\Maxon"
+set "providers[4]=Maxon"
+set "paths[4]=C:\Program Files\Maxon C:\Program Files (x86)\Maxon C:\ProgramData\Maxon"
 
-set "providers[7]=Red Giant"
-set "paths[7]=C:\Program Files\Red Giant C:\Program Files (x86)\Red Giant"
+set "providers[5]=Red Giant"
+set "paths[5]=C:\Program Files\Red Giant C:\Program Files (x86)\Red Giant"
 
-set "providers[8]=Dassault Systems (SolidWorks)"
-set "paths[8]=C:\Program Files\SolidWorks C:\Program Files\Dassault Systemes C:\Program Files (x86)\SolidWorks C:\Program Files (x86)\Dassault Systemes"
+set "providers[6]=Dassault Systems (SolidWorks)"
+set "paths[6]=C:\Program Files\SolidWorks C:\Program Files\Dassault Systemes C:\Program Files (x86)\SolidWorks C:\Program Files (x86)\Dassault Systemes"
 
-:: Function to set the console color
-:color
-    echo|set /p=" " > nul
-    for /f %%i in ('"prompt $H & echo on & for %%N in (1) do rem"') do (
-        call set "ascii=%%i"
+:: Check if script is run as administrator
+:check_admin
+    net session >nul 2>&1
+    if %errorlevel% neq 0 (
+        echo.
+        echo This script must be run as Administrator.
+        echo Attempting to re-launch with elevated privileges...
+        powershell -Command "Start-Process '%~f0' -Verb RunAs"
+        exit /b
     )
-    <nul set /p"= %ascii%"
-    color %1
-    goto :eof
+
+:: If admin, proceed with script
+echo Running with Administrator privileges...
+goto menu
 
 :: Main menu for user selection
 :menu
 cls
+color %COLOR_GREEN%
 echo Choose a provider to block or delete rules:
 echo.
-for /L %%i in (0,1,9999) do (
-    if defined providers[%%i] (
-        echo %%i: !providers[%%i]!
-    ) else (
-        goto after_provider_list
-    )
-)
+
+:: Iterate through defined providers
+set i=0
+:provider_loop
+if not defined providers[%i%] goto after_provider_list
+echo !i!: !providers[%i%]!
+set /a i+=1
+goto provider_loop
 
 :after_provider_list
+color %COLOR_RESET%
 echo 99: Delete all rules (added by this script)
 echo 0: Exit
 echo.
 
 set /p "choice=Enter your choice (0-99): "
 
-:: Validate the user's choice
+:: Dynamic input validation based on the number of providers
+set max_choice=!i!
 if "%choice%"=="0" (
     goto end
 ) else if "%choice%"=="99" (
     goto delete_menu
-) else if "%choice%" geq "0" if "%choice%" leq "2" (
+) else if "%choice%" lss "%max_choice%" (
     goto process_provider
 ) else (
     echo Invalid choice, try again.
@@ -109,11 +104,13 @@ if "%choice%"=="0" (
 :: Menu for deleting rules (inbound, outbound, both)
 :delete_menu
 cls
+color %COLOR_RED%
 echo Select which rules to delete:
 echo 1: Delete Outbound rules (added by this script)
 echo 2: Delete Inbound rules (added by this script)
 echo 3: Delete both Inbound and Outbound rules (added by this script)
 echo.
+color %COLOR_RESET%
 
 set /p "delete_choice=Enter your choice (1-3): "
 if "%delete_choice%"=="1" (
@@ -131,54 +128,54 @@ if "%delete_choice%"=="1" (
 :: Delete Outbound rules
 :delete_outbound
 cls
-call :color %COLOR_RED%
+color %COLOR_RED%
 echo Deleting all outbound firewall rules (added by this script)...
 for /f "tokens=*" %%r in ('powershell -command "(Get-NetFirewallRule | where {$_.DisplayName -like '*-block'}).DisplayName"') do (
     for %%D in (out) do (
         netsh advfirewall firewall delete rule name="%%r" dir=%%D
     )
 )
-call :color %COLOR_GREEN%
+color %COLOR_GREEN%
 echo Outbound rules deleted successfully.
 goto firewall_check
 
 :: Delete Inbound rules
 :delete_inbound
 cls
-call :color %COLOR_RED%
+color %COLOR_RED%
 echo Deleting all inbound firewall rules (added by this script)...
 for /f "tokens=*" %%r in ('powershell -command "(Get-NetFirewallRule | where {$_.DisplayName -like '*-block'}).DisplayName"') do (
     for %%D in (in) do (
         netsh advfirewall firewall delete rule name="%%r" dir=%%D
     )
 )
-call :color %COLOR_GREEN%
+color %COLOR_GREEN%
 echo Inbound rules deleted successfully.
 goto firewall_check
 
 :: Delete Both Inbound and Outbound rules
 :delete_both
 cls
-call :color %COLOR_RED%
+color %COLOR_RED%
 echo Deleting all inbound and outbound firewall rules (added by this script)...
 for /f "tokens=*" %%r in ('powershell -command "(Get-NetFirewallRule | where {$_.DisplayName -like '*-block'}).DisplayName"') do (
     for %%D in (in out) do (
         netsh advfirewall firewall delete rule name="%%r" dir=%%D
     )
 )
-call :color %COLOR_GREEN%
+color %COLOR_GREEN%
 echo Inbound and Outbound rules deleted successfully.
 goto firewall_check
 
 :: Process each provider's paths and block executables
 :process_provider
 cls
+color %COLOR_YELLOW%
 set "selected_provider=!providers[%choice%]!"
 set "selected_paths=!paths[%choice%]!"
 
-call :color %COLOR_YELLOW%
 echo Blocking executables for %selected_provider%...
-call :color %COLOR_RESET%
+color %COLOR_RESET%
 
 for %%P in (%selected_paths%) do (
     if exist "%%P" (
@@ -186,9 +183,9 @@ for %%P in (%selected_paths%) do (
             call :check_and_block "%%X" "%selected_provider%"
         )
     ) else (
-        call :color %COLOR_RED%
+        color %COLOR_RED%
         echo Path not found: %%P
-        call :color %COLOR_RESET%
+        color %COLOR_RESET%
     )
 )
 echo Blocking completed for %selected_provider%.
@@ -217,11 +214,11 @@ goto :eof
 
 :: Notify user to check Windows Firewall with Advanced Security
 :firewall_check
-call :color %COLOR_GREEN%
+color %COLOR_GREEN%
 echo.
 echo All changes completed. Please open "Windows Firewall with Advanced Security" to verify the rules.
 echo.
-call :color %COLOR_RESET%
+color %COLOR_RESET%
 pause
 goto menu
 
