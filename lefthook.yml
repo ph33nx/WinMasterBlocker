@@ -1,0 +1,21 @@
+pre-commit:
+  parallel: true
+  commands:
+    lint-bat:
+      glob: "*.bat"
+      run: bash tools/lint-bat.sh {staged_files}
+    format-check:
+      glob: "*.bat"
+      run: bash tools/format-check.sh {staged_files}
+    audit-coverage:
+      glob: "WinMasterBlocker.bat"
+      run: bash tools/audit-coverage.sh
+
+pre-push:
+  commands:
+    audit-coverage:
+      run: bash tools/audit-coverage.sh
+    lint-bat:
+      run: bash tools/lint-bat.sh WinMasterBlocker.bat
+    format-check:
+      run: bash tools/format-check.sh WinMasterBlocker.bat

@@ -1,0 +1,65 @@
+name: Bug report
+description: An executable is still reaching the internet, or the script errored out.
+title: "[bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report this. Please attach the transcript log
+        (`%TEMP%\WinMasterBlocker-*.log`). Reports without the log usually need a
+        round-trip to triage; with the log, most issues are resolved on first reply.
+
+  - type: input
+    id: windows-version
+    attributes:
+      label: Windows version
+      description: "Run `winver` and paste the version string (for example, Windows 11 24H2 build 26100.4202)."
+      placeholder: "Windows 11 24H2 build 26100.xxxx"
+    validations:
+      required: true
+
+  - type: input
+    id: app
+    attributes:
+      label: Application and version
+      description: "The vendor and the specific app + version that is still phoning home."
+      placeholder: "Adobe Acrobat DC 2026.001.20245"
+    validations:
+      required: true
+
+  - type: input
+    id: exe-path
+    attributes:
+      label: Full path to the offending executable
+      placeholder: "C:\\Program Files\\Adobe\\Acrobat DC\\Acrobat\\acrocef_1\\acrocef.exe"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: ran-update
+    attributes:
+      label: After the most recent application update, did you re-run the script (or option 98)?
+      options:
+        - "Yes, re-ran after update"
+        - "No, did not re-run after update"
+        - "Not sure"
+    validations:
+      required: true
+
+  - type: textarea
+    id: transcript
+    attributes:
+      label: Transcript log excerpt
+      description: "Paste the contents of %TEMP%\\WinMasterBlocker-*.log, or the relevant section."
+      render: text
+    validations:
+      required: false
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else worth knowing
+      description: "Custom install path, non-default drive, group policy involvement, etc."
+    validations:
+      required: false

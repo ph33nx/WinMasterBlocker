@@ -1,0 +1,272 @@
+name: e2e
+
+# Real end-to-end test on a windows-latest runner. Drops WHATIF, runs the
+# script in real-mode, creates actual Windows Firewall rules, verifies via
+# Get-NetFirewallRule, exercises the menu, delete, idempotency, WHATIF, and
+# the known-CEF sweep against a custom drive. Manual trigger only — heavy.
+#
+# To trigger:
+#   gh workflow run e2e.yml --ref maintenance-2026-05
+# or use the "Run workflow" button on the Actions tab. Set `enable_tmate=true`
+# if you want an interactive SSH session opened just before cleanup.
+
+on:
+  workflow_dispatch:
+    inputs:
+      enable_tmate:
+        description: "Open a tmate SSH session before cleanup (interactive)"
+        type: boolean
+        default: false
+      tmate_only:
+        description: "Skip all tests, just open a tmate session immediately"
+        type: boolean
+        default: false
+  # Auto-run on PRs that touch the script or this workflow. Manual
+  # triggers via workflow_dispatch only register against the default
+  # branch, so this is how we run real-mode tests before merging.
+  pull_request:
+    branches: [main]
+    paths:
+      - "WinMasterBlocker.bat"
+      - ".github/workflows/e2e.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    name: End-to-end on real Windows
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Tmate (immediate, if requested)
+        if: ${{ inputs.tmate_only }}
+        uses: mxschmitt/action-tmate@v3
+        with:
+          detached: false
+
+      - name: Pre-clean any stale *-block rules from previous runs
+        shell: pwsh
+        run: |
+          $stale = Get-NetFirewallRule -DisplayName '*-block' -ErrorAction SilentlyContinue
+          if ($stale) {
+            Write-Host "Removing $($stale.Count) stale rule(s)"
+            $stale | Remove-NetFirewallRule
+          } else {
+            Write-Host "No stale rules"
+          }
+
+      - name: Stage fake install trees
+        shell: pwsh
+        run: |
+          # Empty fake tree for WMB_TEST_ROOT (keeps the main path-table walk
+          # from picking up unrelated runner binaries).
+          $fake = Join-Path $env:RUNNER_TEMP 'wmb-fake'
+          New-Item -ItemType Directory -Force -Path $fake | Out-Null
+          foreach ($sub in @(
+            'Program Files\Adobe',
+            'Program Files (x86)\Adobe',
+            'Common Files\Adobe',
+            'Common Files (x86)\Adobe',
+            'ProgramData\Adobe',
+            'AppData\Local\Adobe',
+            'AppData\Roaming\Adobe'
+          )) {
+            New-Item -ItemType Directory -Force -Path (Join-Path $fake $sub) | Out-Null
+          }
+
+          # Custom-drive install: D:\Adobe\ is what the new known-sweep alphabet
+          # walk catches. We seed acrocef.exe and RdrCEF.exe here so the only
+          # path that can produce rules is the sweep.
+          $custom = 'D:\Adobe\Acrobat DC\Acrobat\acrocef_1'
+          New-Item -ItemType Directory -Force -Path $custom | Out-Null
+          fsutil file createnew (Join-Path $custom 'acrocef.exe') 1024 | Out-Null
+
+          $rdr = 'D:\Adobe\Reader DC\Reader'
+          New-Item -ItemType Directory -Force -Path $rdr | Out-Null
+          fsutil file createnew (Join-Path $rdr 'RdrCEF.exe') 1024 | Out-Null
+
+          # User-profile install (second known-sweep target). Acrobat.exe is
+          # in the script's known-exe list; the sweep matches by literal name.
+          $up = Join-Path $env:USERPROFILE 'Adobe\Acrobat\bin'
+          New-Item -ItemType Directory -Force -Path $up | Out-Null
+          fsutil file createnew (Join-Path $up 'Acrobat.exe') 1024 | Out-Null
+
+          "FAKE_ROOT=$fake" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          Write-Host "FAKE_ROOT=$fake"
+          Write-Host "Custom drive seeded: D:\Adobe\..."
+          Write-Host "User-profile seeded: $up"
+
+      # ---------------------------------------------------------------------
+      # SCENARIO 1 — real block via unattended mode.
+      # ---------------------------------------------------------------------
+      - name: "S1: block creates real firewall rules"
+        if: ${{ !inputs.tmate_only }}
+        shell: cmd
+        env:
+          WMB_VENDOR: "Adobe"
+          WMB_QUIET: "1"
+          WMB_TEST_ROOT: ${{ runner.temp }}\wmb-fake
+        run: WinMasterBlocker.bat
+
+      - name: "S1: verify acrocef Adobe-block exists (in + out)"
+        if: ${{ !inputs.tmate_only }}
+        shell: pwsh
+        run: |
+          $rules = Get-NetFirewallRule -DisplayName 'acrocef Adobe-block' -ErrorAction SilentlyContinue
+          if ($rules.Count -ne 2) {
+            Write-Host "::error::expected 2 rules (in+out) for acrocef, got $($rules.Count)"
+            $all = Get-NetFirewallRule -DisplayName '*-block' -ErrorAction SilentlyContinue
+            Write-Host "All *-block rules on host:"
+            $all | Select-Object DisplayName,Direction,Action | Format-Table
+            exit 1
+          }
+          foreach ($r in $rules) {
+            if ($r.Action -ne 'Block') {
+              Write-Host "::error::rule $($r.DisplayName) dir=$($r.Direction) action=$($r.Action), expected Block"
+              exit 1
+            }
+          }
+          Write-Host "S1 ok: 2 acrocef rules, both Block"
+
+      - name: "S1: verify RdrCEF + Acrobat (known-sweep proof)"
+        if: ${{ !inputs.tmate_only }}
+        shell: pwsh
+        run: |
+          $missing = @()
+          foreach ($name in @('RdrCEF Adobe-block','Acrobat Adobe-block')) {
+            $rules = Get-NetFirewallRule -DisplayName $name -ErrorAction SilentlyContinue
+            if ($rules.Count -ne 2) {
+              $missing += "$name (got $($rules.Count))"
+            }
+          }
+          if ($missing.Count -gt 0) {
+            Write-Host "::error::known-sweep regression: $($missing -join '; ')"
+            Write-Host "All *-block rules currently on host:"
+            Get-NetFirewallRule -DisplayName '*-block' -ErrorAction SilentlyContinue | Select-Object DisplayName,Direction,Action | Format-Table
+            exit 1
+          }
+          Write-Host "S1 ok: known-sweep caught D:\Adobe\ + %USERPROFILE%\Adobe\"
+
+      # ---------------------------------------------------------------------
+      # SCENARIO 2 — idempotency. Re-running adds zero new rules.
+      # ---------------------------------------------------------------------
+      - name: "S2: count rules before re-run"
+        if: ${{ !inputs.tmate_only }}
+        shell: pwsh
+        run: |
+          $n = (Get-NetFirewallRule -DisplayName '*-block' -ErrorAction SilentlyContinue).Count
+          "BEFORE_COUNT=$n" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          Write-Host "BEFORE_COUNT=$n"
+
+      - name: "S2: re-run script (should be idempotent)"
+        if: ${{ !inputs.tmate_only }}
+        shell: cmd
+        env:
+          WMB_VENDOR: "Adobe"
+          WMB_QUIET: "1"
+          WMB_TEST_ROOT: ${{ runner.temp }}\wmb-fake
+        run: WinMasterBlocker.bat
+
+      - name: "S2: verify count unchanged"
+        if: ${{ !inputs.tmate_only }}
+        shell: pwsh
+        run: |
+          $after = (Get-NetFirewallRule -DisplayName '*-block' -ErrorAction SilentlyContinue).Count
+          if ($after -ne [int]$env:BEFORE_COUNT) {
+            Write-Host "::error::idempotency broken: before=$env:BEFORE_COUNT after=$after"
+            exit 1
+          }
+          Write-Host "S2 ok: $after rules (unchanged)"
+
+      # ---------------------------------------------------------------------
+      # SCENARIO 3 — delete via unattended mode.
+      # ---------------------------------------------------------------------
+      - name: "S3: delete all via WMB_ACTION=delete"
+        if: ${{ !inputs.tmate_only }}
+        shell: cmd
+        env:
+          WMB_VENDOR: "Adobe"
+          WMB_ACTION: "delete"
+          WMB_QUIET: "1"
+        run: WinMasterBlocker.bat
+
+      - name: "S3: verify zero *-block rules remain"
+        if: ${{ !inputs.tmate_only }}
+        shell: pwsh
+        run: |
+          $remaining = Get-NetFirewallRule -DisplayName '*-block' -ErrorAction SilentlyContinue
+          if ($remaining) {
+            Write-Host "::error::delete left $($remaining.Count) rule(s) behind:"
+            $remaining | Select-Object DisplayName,Direction | Format-Table
+            exit 1
+          }
+          Write-Host "S3 ok: all -block rules removed"
+
+      # ---------------------------------------------------------------------
+      # SCENARIO 4 — WHATIF makes zero firewall changes.
+      # ---------------------------------------------------------------------
+      - name: "S4: WHATIF mode creates no rules"
+        if: ${{ !inputs.tmate_only }}
+        shell: cmd
+        env:
+          WHATIF: "1"
+          WMB_VENDOR: "Adobe"
+          WMB_QUIET: "1"
+          WMB_TEST_ROOT: ${{ runner.temp }}\wmb-fake
+        run: WinMasterBlocker.bat
+
+      - name: "S4: verify firewall untouched"
+        if: ${{ !inputs.tmate_only }}
+        shell: pwsh
+        run: |
+          $rules = Get-NetFirewallRule -DisplayName '*-block' -ErrorAction SilentlyContinue
+          if ($rules) {
+            Write-Host "::error::WHATIF created $($rules.Count) real rule(s)!"
+            exit 1
+          }
+          $log = Get-ChildItem $env:TEMP -Filter 'WinMasterBlocker-*.log' | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+          $body = Get-Content $log.FullName -Raw
+          if ($body -notmatch '\[WHATIF\] add ".*acrocef.*Adobe-block"') {
+            Write-Host "::error::WHATIF transcript missing acrocef line"
+            exit 1
+          }
+          Write-Host "S4 ok: no real rules, transcript has [WHATIF] entries"
+
+      # ---------------------------------------------------------------------
+      # Cleanup before tmate / exit. Always runs.
+      # ---------------------------------------------------------------------
+      # Manual opt-in only. Auto-opening on failure() blocks the job
+      # waiting for an SSH client; surfacing the transcript log below is
+      # enough for most diagnoses.
+      - name: Tmate (debug, before cleanup)
+        if: ${{ inputs.enable_tmate }}
+        uses: mxschmitt/action-tmate@v3
+        with:
+          detached: false
+          limit-access-to-actor: true
+
+      - name: Final cleanup
+        if: always()
+        shell: pwsh
+        run: |
+          Get-NetFirewallRule -DisplayName '*-block' -ErrorAction SilentlyContinue | Remove-NetFirewallRule -ErrorAction SilentlyContinue
+          Remove-Item -Recurse -Force -ErrorAction SilentlyContinue D:\Adobe
+          Remove-Item -Recurse -Force -ErrorAction SilentlyContinue (Join-Path $env:USERPROFILE 'Adobe')
+          Remove-Item -Recurse -Force -ErrorAction SilentlyContinue (Join-Path $env:RUNNER_TEMP 'wmb-fake')
+          Write-Host "Cleanup done."
+
+      - name: Surface transcript log on failure
+        if: failure()
+        shell: pwsh
+        run: |
+          Get-ChildItem $env:TEMP -Filter 'WinMasterBlocker-*.log' | Sort-Object LastWriteTime -Descending | ForEach-Object {
+            Write-Host "=== $($_.FullName) ==="
+            Get-Content $_.FullName -Raw
+          }

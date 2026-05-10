@@ -1,0 +1,173 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  lint:
+    name: lint + format + audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: lint
+        run: bash tools/lint-bat.sh WinMasterBlocker.bat
+
+      - name: format-check
+        run: bash tools/format-check.sh WinMasterBlocker.bat
+
+      - name: audit-coverage
+        run: bash tools/audit-coverage.sh WinMasterBlocker.bat
+
+  integration:
+    name: WHATIF integration on Windows
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: stage fake vendor tree
+        shell: pwsh
+        run: |
+          $root = Join-Path $env:RUNNER_TEMP 'wmb-fake'
+          New-Item -ItemType Directory -Force -Path $root | Out-Null
+
+          $adobe = Join-Path $root 'Program Files\Adobe\Acrobat DC\Acrobat\acrocef_1'
+          New-Item -ItemType Directory -Force -Path $adobe | Out-Null
+          New-Item -ItemType File     -Force -Path (Join-Path $adobe 'acrocef.exe') | Out-Null
+
+          $rdr = Join-Path $root 'Program Files\Adobe\Reader DC\Reader'
+          New-Item -ItemType Directory -Force -Path $rdr | Out-Null
+          New-Item -ItemType File     -Force -Path (Join-Path $rdr 'RdrCEF.exe') | Out-Null
+
+          New-Item -ItemType Directory -Force -Path (Join-Path $root 'Program Files (x86)\Adobe') | Out-Null
+          New-Item -ItemType Directory -Force -Path (Join-Path $root 'Common Files\Adobe')        | Out-Null
+          New-Item -ItemType Directory -Force -Path (Join-Path $root 'Common Files (x86)\Adobe')  | Out-Null
+          New-Item -ItemType Directory -Force -Path (Join-Path $root 'ProgramData\Adobe')         | Out-Null
+          New-Item -ItemType Directory -Force -Path (Join-Path $root 'AppData\Local\Adobe')       | Out-Null
+          New-Item -ItemType Directory -Force -Path (Join-Path $root 'AppData\Roaming\Adobe')     | Out-Null
+
+          "FAKE_ROOT=$root" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: run script in WHATIF mode
+        shell: cmd
+        env:
+          WHATIF: "1"
+          WMB_VENDOR: "Adobe"
+          WMB_QUIET: "1"
+          # WMB_TEST_ROOT redirects every path lookup to the fake tree we
+          # staged above. Cleaner than trying to override %ProgramFiles%
+          # from the workflow: GitHub Actions Windows runners ignore
+          # workflow-level overrides for well-known Windows system vars.
+          WMB_TEST_ROOT: ${{ runner.temp }}\wmb-fake
+        run: |
+          echo 0& WinMasterBlocker.bat
+
+      - name: assert rules emitted in transcript
+        shell: pwsh
+        run: |
+          $log = Get-ChildItem $env:TEMP -Filter 'WinMasterBlocker-*.log' | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+          if (-not $log) { Write-Error 'no transcript log produced'; exit 1 }
+          Write-Host "transcript: $($log.FullName)"
+          $body = Get-Content $log.FullName -Raw
+          Write-Host "----- transcript -----"
+          Write-Host $body
+          Write-Host "----- /transcript -----"
+          # Tightened: require an actual rule emission, not just a path walk.
+          if ($body -notmatch 'add ".*acrocef.*Adobe-block"') { Write-Error 'transcript missing acrocef rule emission'; exit 1 }
+          if ($body -notmatch 'add ".*RdrCEF.*Adobe-block"')  { Write-Error 'transcript missing RdrCEF rule emission';  exit 1 }
+          if ($body -notmatch 'WHATIF')                       { Write-Error 'transcript missing WHATIF marker';        exit 1 }
+          Write-Host 'integration ok'
+
+  release:
+    name: GitHub Release on version bump
+    needs: [lint, integration]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Extract WMB_VERSION
+        id: ver
+        run: |
+          V=$(grep -oE 'WMB_VERSION=[0-9]+\.[0-9]+\.[0-9]+' WinMasterBlocker.bat | head -1 | cut -d= -f2)
+          if [ -z "$V" ]; then
+            echo "::error::WMB_VERSION not found in WinMasterBlocker.bat"
+            exit 1
+          fi
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          echo "tag=v$V" >> "$GITHUB_OUTPUT"
+          echo "Script version: $V"
+
+      - name: Skip if release already exists
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh release view "${{ steps.ver.outputs.tag }}" >/dev/null 2>&1; then
+            echo "exists=true"  >> "$GITHUB_OUTPUT"
+            echo "Release ${{ steps.ver.outputs.tag }} already exists, skipping."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Verify CITATION.cff version matches
+        if: steps.check.outputs.exists == 'false'
+        run: |
+          CFF=$(grep -oE '^version: "?[0-9]+\.[0-9]+\.[0-9]+"?' CITATION.cff | head -1 | awk '{print $2}' | tr -d '"')
+          if [ "$CFF" != "${{ steps.ver.outputs.version }}" ]; then
+            echo "::error::CITATION.cff version ($CFF) does not match WMB_VERSION (${{ steps.ver.outputs.version }})"
+            exit 1
+          fi
+
+      - name: SHA-256 checksums
+        if: steps.check.outputs.exists == 'false'
+        run: |
+          sha256sum WinMasterBlocker.bat LICENSE CITATION.cff > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Release notes since previous tag
+        if: steps.check.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PREV=$(gh release list --limit 1 --json tagName -q '.[0].tagName' 2>/dev/null || true)
+          {
+            echo "## Changes since ${PREV:-initial}"
+            echo
+            if [ -n "$PREV" ]; then
+              git log --pretty='* %s (%h)' "${PREV}..HEAD"
+            else
+              git log --pretty='* %s (%h)'
+            fi
+          } > RELEASE_NOTES.md
+          cat RELEASE_NOTES.md
+
+      - name: Publish release
+        if: steps.check.outputs.exists == 'false'
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ steps.ver.outputs.tag }}
+          name: WinMasterBlocker ${{ steps.ver.outputs.tag }}
+          body_path: RELEASE_NOTES.md
+          files: |
+            WinMasterBlocker.bat
+            LICENSE
+            CITATION.cff
+            SHA256SUMS.txt
+          fail_on_unmatched_files: true
+          make_latest: true

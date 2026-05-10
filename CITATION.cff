@@ -1,0 +1,25 @@
+cff-version: 1.2.0
+title: WinMasterBlocker
+message: "If you reference this tool in research, articles, or other software, please cite it using the metadata below."
+type: software
+authors:
+  - alias: ph33nx
+    website: "https://github.com/ph33nx"
+repository-code: "https://github.com/ph33nx/WinMasterBlocker"
+url: "https://github.com/ph33nx/WinMasterBlocker"
+abstract: "A Windows batch script that uses the built-in Windows Firewall command line to block telemetry and license-server traffic from desktop applications such as Adobe Acrobat, Photoshop, Autodesk, Corel and Maxon, with no third-party dependencies."
+keywords:
+  - windows-firewall
+  - netsh
+  - adobe-blocker
+  - acrocef
+  - firewall-rules
+  - internet-blocker
+  - windows-batch
+  - simplewall-alternative
+  - outbound-firewall
+  - application-firewall
+  - windows-sysadmin
+license: MIT
+version: 2.0.0
+date-released: "2026-05-11"

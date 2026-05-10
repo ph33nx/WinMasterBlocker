@@ -1,0 +1,26 @@
+# Local AI agent instructions (not for public repo)
+CLAUDE.md
+AGENTS.md
+.cursorrules
+.aider*
+
+# Editor / OS
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Local tooling
+node_modules/
+.env
+.env.local
+*.log
+
+# Temp files the script itself writes (just in case anyone runs it inside the repo)
+WinMasterBlocker-*.log
+wmb-uac-*.env
+SHA256SUMS.txt
+RELEASE_NOTES.md

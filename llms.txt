@@ -1,0 +1,51 @@
+# WinMasterBlocker
+
+> A Windows batch script that uses the built-in Windows Firewall to block Adobe, Autodesk, Corel, Maxon and Red Giant applications from reaching the internet. No drivers, no third-party tools, no subscription. MIT licensed.
+
+WinMasterBlocker creates `netsh advfirewall` rules per executable for the listed vendors. It is a single batch file with no dependencies. It targets Windows 10 and 11.
+
+## Quickstart
+
+Right-click `WinMasterBlocker.bat`, choose Run as administrator, then pick a vendor from the menu. The script walks every known install path for that vendor (`%ProgramFiles%\Adobe`, `%ProgramFiles(x86)%\Adobe`, `%CommonProgramFiles%\Adobe`, `%ProgramData%\Adobe`, `%LOCALAPPDATA%\Adobe`, `%APPDATA%\Adobe` for Adobe, similar for the other vendors) and adds inbound + outbound `block` rules for every `.exe` it finds. A transcript log lands at `%TEMP%\WinMasterBlocker-<timestamp>.log`.
+
+## What it blocks
+
+Adobe (including AcroCEF, RdrCEF, Acrobat, AcroRd32, AdobeNotificationClient, AdobeIPCBroker, Creative Cloud), Autodesk (AutoCAD, Maya, Revit licensing), Corel, Maxon (Cinema 4D), and Red Giant. The Adobe path covers a known-process sweep on top of the recursive walk so AcroCEF and RdrCEF are caught even when installed under non-standard paths.
+
+## Common questions
+
+**Is `acrocef.exe` blocked?** Yes, both by the recursive walk under `%ProgramFiles%\Adobe` and by an explicit known-process sweep. After an Adobe Acrobat update, re-run the script and pick option 98 to scan the new install state.
+
+**Does it block Windows Update or Defender?** No. The vendor list is Adobe, Corel, Autodesk, Maxon and Red Giant only. Nothing under `%WINDIR%` is walked.
+
+**How do I undo blocks?** Run the script and pick option 99. The script only removes rules whose name ends in `-block` so unrelated firewall rules are left alone.
+
+**Will Adobe still activate?** Yes, but you may need to temporarily disable the rules during initial activation. After activation completes, re-enable them. License re-activations after subscription changes work the same way.
+
+**Is it safe?** No drivers, no service installs, no scheduled tasks, no telemetry, no auto-update. Every action is logged before execution. The full source is one batch file you can read in five minutes.
+
+## Troubleshooting AcroCEF
+
+If `acrocef.exe` is still connecting after a run, three causes account for almost every report. First: Acrobat was updated after the script last ran. Fix: re-run the script (option 98). Second: Acrobat installed components under `%LOCALAPPDATA%\Adobe\` that the previous (pre-2.0) version of the script did not walk. Fix: upgrade to v2.0 which walks `%LOCALAPPDATA%` and `%APPDATA%`. Third (pre-2.0): the duplicate-check made one PowerShell call per executable, and large Adobe installs took 5+ minutes; users killed the run early. Fix: v2.0 caches existing rules once up front; the Adobe walk now completes in seconds.
+
+## Unattended mode
+
+```cmd
+set WMB_VENDOR=Adobe
+set WMB_ACTION=block
+set WMB_QUIET=1
+WinMasterBlocker.bat
+```
+
+Set `WHATIF=1` to log every netsh call instead of executing it (dry run).
+
+## Repository
+
+- Source: https://github.com/ph33nx/WinMasterBlocker
+- License: MIT (`SPDX-License-Identifier: MIT`)
+- Citation: see `CITATION.cff` in the repo root
+- Bug reports: https://github.com/ph33nx/WinMasterBlocker/issues with `%TEMP%\WinMasterBlocker-*.log` attached
+
+## Alternatives
+
+For users who want a GUI, packet logging or per-NIC shaping: SimpleWall (LGPL, free), NetLimiter (commercial), GlassWire (commercial). WinMasterBlocker is the right pick when you want native Windows Firewall rules only, no third-party drivers, and a script you can audit in one read.
