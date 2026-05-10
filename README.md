@@ -5,6 +5,7 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/ph33nx/WinMasterBlocker/releases/latest/download/WinMasterBlocker.bat"><img src="https://img.shields.io/github/v/release/ph33nx/WinMasterBlocker?label=download&color=brightgreen" alt="Download latest"></a>
   <a href="LICENSE"><img src="https://img.shields.io/github/license/ph33nx/WinMasterBlocker?color=informational" alt="MIT License"></a>
   <a href="https://github.com/ph33nx/WinMasterBlocker/stargazers"><img src="https://img.shields.io/github/stars/ph33nx/WinMasterBlocker?color=yellow" alt="GitHub stars"></a>
   <a href="https://github.com/ph33nx/WinMasterBlocker/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/ph33nx/WinMasterBlocker/ci.yml?branch=main&label=ci" alt="CI status"></a>
@@ -33,7 +34,7 @@ Coverage is two-layered. First a recursive walk of every known install path (`%P
 
 ## Quickstart
 
-1. Download `WinMasterBlocker.bat` from this repo.
+1. Download [WinMasterBlocker.bat](https://github.com/ph33nx/WinMasterBlocker/releases/latest/download/WinMasterBlocker.bat) from the [latest release](https://github.com/ph33nx/WinMasterBlocker/releases/latest). Verify with `certutil -hashfile WinMasterBlocker.bat SHA256` against the `SHA256SUMS.txt` from the same release.
 2. Right-click it, **Run as administrator**. If you double-click, the script re-launches itself with elevation through PowerShell.
 3. Pick a vendor from the menu. Pick `98` after a vendor update to re-scan and add any new executables. Pick `99` to remove every rule the script added.
 

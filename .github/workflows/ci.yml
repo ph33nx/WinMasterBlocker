@@ -134,10 +134,10 @@ jobs:
             exit 1
           fi
 
-      - name: SHA-256 checksums
+      - name: SHA-256 checksum
         if: steps.check.outputs.exists == 'false'
         run: |
-          sha256sum WinMasterBlocker.bat LICENSE CITATION.cff > SHA256SUMS.txt
+          sha256sum WinMasterBlocker.bat > SHA256SUMS.txt
           cat SHA256SUMS.txt
 
       - name: Release notes since previous tag
@@ -166,8 +166,6 @@ jobs:
           body_path: RELEASE_NOTES.md
           files: |
             WinMasterBlocker.bat
-            LICENSE
-            CITATION.cff
             SHA256SUMS.txt
           fail_on_unmatched_files: true
           make_latest: true
